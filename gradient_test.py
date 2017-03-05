@@ -22,7 +22,7 @@ def adjoint(m):
   h = backward(inp)
   v = TestFunction(h.function_space())
   result = Function(h.function_space())
-  result.vector()[:] = h.vector().array() * assemble(inner(Constant((1,1,1)),v)*dx).array()
+  assemble(inner(h, v)*dx, result.vector())
 
   return result
 
