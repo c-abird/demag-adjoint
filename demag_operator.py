@@ -15,7 +15,7 @@ class DemagPotentialOperator(object):
     V = FunctionSpace(mesh, "CG", 1)
     u = TrialFunction(V)
     v = TestFunction(V)
-    Vv = VectorFunctionSpace(mesh, "CG", 1)
+    Vv = VectorFunctionSpace(mesh, "DG", 0)
     uv = TrialFunction(Vv)
 
     self.mesh = mesh
@@ -78,7 +78,7 @@ class DirectedDemagFieldOperator(object):
 
     mesh = demag_operator.mesh
 
-    V = VectorFunctionSpace(mesh, "CG", 1)
+    V = VectorFunctionSpace(mesh, "DG", 0)
     u = TrialFunction(V)
     v = TestFunction(V)
 
@@ -98,7 +98,7 @@ class DirectedDemagFieldOperator(object):
 
     # setup target function space
     target_mesh = SubMesh(mesh, target_domain)
-    self._V_target = VectorFunctionSpace(target_mesh, "CG", 1)
+    self._V_target = VectorFunctionSpace(target_mesh, "DG", 0)
     
   def __call__(self, m):
     # project from source to complete mesh

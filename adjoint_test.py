@@ -6,7 +6,7 @@ from demag_operator import *
 from custom_dolfin_adjoint_function import *
 
 #parameters["adjoint"]["test_derivative"] = True
-mesh = Mesh("mesh/cubes.xml.gz")
+mesh = Mesh("mesh/cube_pad.xml.gz")
 
 demag_potential = DemagPotentialOperator(mesh)
 forward = DirectedDemagFieldOperator(demag_potential, 1, 2)
@@ -33,10 +33,10 @@ def adjoint(m):
 # submeshes and function spaces
 mesh_magnet = SubMesh(mesh, 1)
 mesh_measure = SubMesh(mesh, 2)
-Vmagnet = VectorFunctionSpace(mesh_magnet, "CG", 1)
-Vmeasure = VectorFunctionSpace(mesh_measure, "CG", 1)
+Vmagnet = VectorFunctionSpace(mesh_magnet, "DG", 0)
+Vmeasure = VectorFunctionSpace(mesh_measure, "DG", 0)
 
-m = interpolate(Constant((1,0,0)), Vmagnet)
+m = interpolate(Constant((0,0,1)), Vmagnet)
 
 func = CustomDolfinAdjointFunction(forward, adjoint)
 h = func(m)

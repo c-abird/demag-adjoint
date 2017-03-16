@@ -28,19 +28,19 @@ def adjoint(m):
 
 submesh1 = SubMesh(mesh, 1)
 submesh2 = SubMesh(mesh, 2)
-V1 = VectorFunctionSpace(submesh1, "CG", 1)
-V2 = VectorFunctionSpace(submesh2, "CG", 1)
+V1 = VectorFunctionSpace(submesh1, "DG", 0)
+V2 = VectorFunctionSpace(submesh2, "DG", 0)
 
-x1 = interpolate(Constant((0,1,0)), V1)
-x2 = interpolate(Constant((0,1,0)), V2)
+#x1 = interpolate(Constant((0,1,0)), V1)
+#x2 = interpolate(Constant((0,1,0)), V2)
 
-#x1 = Function(V1)
-#x2 = Function(V2)
-#x1.vector()[:] = np.random.random(x1.vector().size()) * 1e2
-#x2.vector()[:] = np.random.random(x2.vector().size()) * 1e2
+x1 = Function(V1)
+x2 = Function(V2)
+x1.vector()[:] = np.random.random(x1.vector().size()) * 1e2
+x2.vector()[:] = np.random.random(x2.vector().size()) * 1e2
 
-print assemble(inner(forward(x1), x2)*dx(submesh2))
-print assemble(inner(backward(x2), x1)*dx(submesh1))
+#print assemble(inner(forward(x1), x2)*dx(submesh2))
+#print assemble(inner(backward(x2), x1)*dx(submesh1))
 
 print forward(x1).vector().array().dot(x2.vector().array())
 print adjoint(x2).vector().array().dot(x1.vector().array())
