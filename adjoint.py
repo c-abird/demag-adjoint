@@ -5,8 +5,8 @@ import numpy as np
 from demag_operator import *
 from custom_dolfin_adjoint_function import *
 
-#parameters["adjoint"]["test_derivative"] = True
-mesh = Mesh("mesh/cube_pad.xml.gz")
+#mesh = Mesh("mesh/cube_pad.xml.gz")
+mesh = Mesh("mesh/cubes.xml.gz")
 
 demag_potential = DemagPotentialOperator(mesh)
 forward = DirectedDemagFieldOperator(demag_potential, 1, 2)
@@ -29,23 +29,25 @@ def adjoint(m):
 
   return result
 
+V = VectorFunctionSpace(mesh, "DG", 0)
+dx = Measure('dx', mesh, subdomain_data = MeshFunction('size_t', mesh, 3, mesh.domains()))
 
-# submeshes and function spaces
-mesh_magnet = SubMesh(mesh, 1)
-mesh_measure = SubMesh(mesh, 2)
-Vmagnet = VectorFunctionSpace(mesh_magnet, "DG", 0)
-Vmeasure = VectorFunctionSpace(mesh_measure, "DG", 0)
+m = interpolate(Constant((0,0,1)), V)
 
-m = interpolate(Constant((0,0,1)), Vmagnet)
+demag = CustomDolfinAdjointFunction(forward, adjoint)
 
-func = CustomDolfinAdjointFunction(forward, adjoint)
-h = func(m)
+h_target = Function(V, "h_target.xml")
+#h_target = Constant((0,0,1))
+h = demag(m)
 
-J = Functional(0.5 * inner(h, h) * dx)
-
-# Reduced functional with single control
+J = Functional(0.5 * inner(h - h_target, h - h_target) * dx(2) + 1e-20 * inner(m, m) * dx(1))
 m = Control(m)
 
 Jhat = ReducedFunctional(J, m)
-Jhat.taylor_test(m)# > 1.9
-#adj_html("complete.html", "forward")
+
+Jhat.taylor_test(m)
+exit()
+#m_opt = minimize(Jhat, tol = 1e-20)
+
+File("m.pvd") << m_opt
+File("h.pvd") << demag(m_opt)

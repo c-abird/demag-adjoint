@@ -77,7 +77,6 @@ class DirectedDemagFieldOperator(object):
     self._demag = demag_operator
 
     mesh = demag_operator.mesh
-
     V = VectorFunctionSpace(mesh, "DG", 0)
     u = TrialFunction(V)
     v = TestFunction(V)
@@ -85,25 +84,22 @@ class DirectedDemagFieldOperator(object):
     cell_domains = MeshFunction('size_t', mesh, 3, mesh.domains())
     dx = Measure('dx', mesh, subdomain_data = cell_domains)
 
-    # setup domain restricted projection
-    # this is pretty expensive for what it is, but is the shortest code I came up with
-    self._project = Struct()
-    self._project.result = Function(V)
+    mass_rec = as_backend_type(assemble(inner(Constant((1,1,1)), v) * dx)).vec()
+    mass_rec.reciprocal()
+    mass_src = as_backend_type(assemble(inner(Constant((1,1,1)), v) * dx(source_domain))).vec()
+    mass_trg = as_backend_type(assemble(inner(Constant((1,1,1)), v) * dx(target_domain))).vec()
 
-    A = assemble(inner(u, v) * dx)
-    self._project.solver = LUSolver(A, "mumps")
-    self._project.solver.parameters['reuse_factorization'] = True
-    self._project.v = v
-    self._project.dx = dx(source_domain)
+    self._Asrc = assemble(inner(u, v) * dx)
+    self._Asrc.zero()
+    self._Asrc.set_diagonal(PETScVector(mass_rec * mass_src))
 
-    # setup target function space
-    target_mesh = SubMesh(mesh, target_domain)
-    self._V_target = VectorFunctionSpace(target_mesh, "DG", 0)
+    self._Atrg = assemble(inner(u, v) * dx)
+    self._Atrg.zero()
+    self._Atrg.set_diagonal(PETScVector(mass_rec * mass_trg))
     
-  def __call__(self, m):
-    # project from source to complete mesh
-    b = assemble(inner(m, self._project.v) * self._project.dx)
-    self._project.solver.solve(self._project.result.vector(), b)
+    self._V = V
 
-    # project gradient of potential onto target mesh
-    return project(-grad(self._demag(self._project.result)), self._V_target)
+  def __call__(self, m):
+    msrc = Function(self._V, self._Asrc * m.vector())
+    h = project(- grad(self._demag(msrc)), self._V)
+    return Function(self._V, self._Atrg * h.vector())
