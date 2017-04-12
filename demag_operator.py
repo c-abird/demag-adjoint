@@ -5,17 +5,23 @@ from bempp.api.operators.boundary.laplace import double_layer
 from bempp.api.operators.boundary.sparse import identity
 from bempp.api.assembly import InverseSparseDiscreteBoundaryOperator
 from bempp.api.common import global_parameters
+from custom_dolfin_adjoint_function import *
 
-__all__ = ["DemagPotentialOperator", "DirectedDemagFieldOperator"]
+__all__ = ["DemagPotentialOperator", "DirectedDemagFieldOperator", "DemagAdjointFunction"]
 
 class Struct(object): pass
 
 class DemagPotentialOperator(object):
-  def __init__(self, mesh):
+  def __init__(self, mesh, function_space = "DG"):
     V = FunctionSpace(mesh, "CG", 1)
     u = TrialFunction(V)
     v = TestFunction(V)
-    Vv = VectorFunctionSpace(mesh, "DG", 0)
+    if function_space == "DG":
+      Vv = VectorFunctionSpace(mesh, "DG", 0)
+    elif function_space == "CG":
+      Vv = VectorFunctionSpace(mesh, "CG", 1)
+    else:
+      raise Exception()
     uv = TrialFunction(Vv)
 
     self.mesh = mesh
@@ -73,11 +79,17 @@ class DemagPotentialOperator(object):
     return Function(self._V, self._u1.result.vector() + self._u2.result.vector())
 
 class DirectedDemagFieldOperator(object):
-  def __init__(self, demag_operator, source_domain, target_domain):
+  def __init__(self, demag_operator, source_domain, target_domain, function_space = "DG"):
     self._demag = demag_operator
 
     mesh = demag_operator.mesh
-    V = VectorFunctionSpace(mesh, "DG", 0)
+    if function_space == "DG":
+      V = VectorFunctionSpace(mesh, "DG", 0)
+    elif function_space == "CG":
+      V = VectorFunctionSpace(mesh, "CG", 1)
+    else:
+      raise Exception()
+
     u = TrialFunction(V)
     v = TestFunction(V)
 
@@ -103,3 +115,36 @@ class DirectedDemagFieldOperator(object):
     msrc = Function(self._V, self._Asrc * m.vector())
     h = project(- grad(self._demag(msrc)), self._V)
     return Function(self._V, self._Atrg * h.vector())
+
+class DemagAdjointFunction(CustomDolfinAdjointFunction):
+  def __init__(self, mesh, source_domain, target_domain, function_space = "DG"):
+    if function_space == "DG":
+      self.function_space = VectorFunctionSpace(mesh, "DG", 0)
+    elif function_space == "CG":
+      self.function_space = VectorFunctionSpace(mesh, "CG", 1)
+    else:
+      raise Exception()
+
+    demag_potential = DemagPotentialOperator(mesh, function_space)
+    forward = DirectedDemagFieldOperator(demag_potential, source_domain, target_domain, function_space)
+
+    # define adjoint operator
+    backward = DirectedDemagFieldOperator(demag_potential, target_domain, source_domain, function_space)
+    def adjoint(m):
+      u = TrialFunction(m.function_space())
+      v = TestFunction(m.function_space())
+      inp = Function(m.function_space())
+      A = assemble(inner(u, v)*dx)
+      solve(A, inp.vector(), m.vector())
+
+      h = backward(inp)
+
+      u = TrialFunction(h.function_space())
+      v = TestFunction(h.function_space())
+      result = Function(h.function_space())
+      assemble(inner(h, v)*dx, result.vector())
+
+      return result
+
+
+    super(DemagAdjointFunction, self).__init__(forward, adjoint)
